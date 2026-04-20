@@ -58,5 +58,5 @@ def test_registration_unhappy_path_duplicate_enrollment_keeps_state_consistent(s
         timeout=5.0,
     )
     roster = stub.GetSectionRoster(gateway_pb2.GetSectionRosterRequest(section_id="CSC36000-03"), timeout=5.0)
-    assert schedule.section_ids.count("CSC36000-03") == 1
-    assert roster.student_ids.count("student-repeat") == 1
+    assert list(schedule.section_ids).count("CSC36000-03") == 1
+    assert list(roster.student_ids).count("student-repeat") == 1

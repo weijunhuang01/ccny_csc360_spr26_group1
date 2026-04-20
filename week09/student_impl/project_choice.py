@@ -117,8 +117,8 @@ class IsolationTradeoff(str, Enum):
 #
 # These declarations are part of the grading contract. Keep them honest:
 # the tests compare them against behavior, and your student_impl/README.md
-# should explain why the declarations are appropriate.
+# should explain wpython scripts/run_cluster.pyhy the declarations are appropriate.
 
 SELECTED_APPLICATION = ApplicationChoice.COURSE_REGISTRATION
 SELECTED_SHARDING_TRADEOFF = ShardingTradeoff.HASH_DISTRIBUTED
-SELECTED_ISOLATION_TRADEOFF = IsolationTradeoff.SERIALIZABLE_LIKE
+SELECTED_ISOLATION_TRADEOFF = IsolationTradeoff.READ_COMMITTED_LIKE

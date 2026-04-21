@@ -54,13 +54,16 @@ def cluster_ports(cluster_data: ClusterState) -> list[int]:
 def best_effort_stop_listening_ports(port_numbers: list[int]) -> None:
     discovered_pids: set[int] = set()
     for port_number in port_numbers:
-        proc = subprocess.run(
-            ["lsof", "-t", f"-iTCP:{port_number}", "-sTCP:LISTEN"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=False,
-        )
+        try:
+            proc = subprocess.run(
+                ["lsof", "-t", f"-iTCP:{port_number}", "-sTCP:LISTEN"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError:
+            continue
         if proc.returncode not in (0, 1):
             continue
         for line in proc.stdout.splitlines():

@@ -19,22 +19,22 @@ from week09_common import ClusterState
 
 
 def best_effort_stop_pid(pid: Any) -> None:
-    if not isinstance(pid, int):
+    if not isinstance(pid, int) or pid <= 0:
         return
     try:
         os.kill(pid, signal.SIGTERM)
-    except OSError:
+    except (OSError, SystemError, ValueError):
         return
     deadline = time.time() + 3.0
     while time.time() < deadline:
         try:
             os.kill(pid, 0)
-        except OSError:
+        except (OSError, SystemError, ValueError):
             return
         time.sleep(0.05)
     try:
         os.kill(pid, signal.SIGKILL)
-    except OSError:
+    except (OSError, SystemError, ValueError):
         pass
 
 

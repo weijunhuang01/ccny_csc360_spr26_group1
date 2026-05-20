@@ -2,7 +2,7 @@ Student 2 : The Data Plane (Block Storage & Integrity)
 Name:Weijun Huang
  
 
-Architectural Design: Block Storage & Algorithmic Placement
+A-Architectural Design: Block Storage & Algorithmic Placement
 
 When we build a storage system that needs to hold petabytes of data, the biggest challenge isn't just buying enough hard drives; it is figuring out how to find our files quickly without the system slowing down as it grows.
 
@@ -34,7 +34,9 @@ Because the total number of servers changed, the destination for almost every fi
 
 By using CRUSH's consistent hashing weights, when we add a new server rack, the math ensures that only 1/(N+1) — just 20% of the data — needs to move to the new server. The remaining 80% stays completely untouched on its original disks, keeping the system stable.
 
-Fault Tolerance & Storage: Replication vs. Erasure Coding
+
+
+B-Fault Tolerance & Storage: Replication vs. Erasure Coding
 
 In a system this large, hardware failure isn't just a possibility; it's a daily event. We must decide how to protect the data without spending too much money.
 
@@ -68,7 +70,9 @@ Total storage = 5 PB × (1 + 4/10) = 5 PB × 1.4 = 7 PB. This is only a 40% extr
 
 By using 10 + 4 Erasure Coding, our data plane saves exactly 8 Petabytes of disk infrastructure costs (15 PB minus 7 PB). The tradeoff is computation: when a node crashes, the system must pull 10 surviving fragments into CPU memory and do intensive math to rebuild the missing pieces, which increases read latency during system degradation.
 
-Quorums & Repair: The Math of Consistency
+
+
+C-Quorums & Repair: The Math of Consistency
 
 In a distributed system, computers sometimes lose connection with each other. This is called a network partition. We use Quorum logic to make sure that even if some computers are down, the user always sees the newest version of their file.
 

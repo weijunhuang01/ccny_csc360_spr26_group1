@@ -1,0 +1,46 @@
+Student 1 （Farida Balogun）: The Control Plane (Metadata Scaling & Sharding) 
+
+A - Architectural Design - Relational Metadata Cluster  
+
+    The metadata layer is the control plane of the storage system. It tracks files, manifests, permissions, version history, chunk references, synchronization state, and device cursors. Because the system stores petabytes of object data, the relational database should only store metadata, not raw file contents. File chunks live in object storage, while the relational cluster guarantees transactional correctness for manifests and permissions. 
+
+See Figure 1 ./figure1.png        &     Figure 2 ./figure2.png
+                
+
+    The primary tables include files/folders (tracking attributes such as file_id, parent_folder_id, ownership, timestamps, and hierarchy), versions (storing chunk manifests, checksums, timestamps, and deletion markers for version control and recovery), and permissions (managing user/group access levels with inheritance support). Together, these entities allow the system to maintain file organization, support versioning, and enforce smooth access control across distributed storage nodes. 
+
+    To scale metadata horizontally, the database cluster uses sharding. Two major strategies are hash sharding and range sharding. Hash sharding distributes records using a function like hash(file_id) mod N, which spreads data evenly across shards and prevents predictable hotspots. It is simple to implement and balances load effectively. However, it destroys data locality because files within the same folder are scattered across many shards. As a result, operations such as folder listings or hierarchical queries require expensive scatter gather requests across the cluster, making common file system workloads inefficient. 
+
+    Range sharding partitions metadata sequentially using keys such as folder_path or (tenant_id, path). This preserves namespace hierarchy and locality, allowing folder listings and directory traversals to be handled by a single shard. It also naturally isolates tenants. However, range sharding introduces imbalance risks because some folders or tenants may become significantly larger or more active than others. Popular shared directories can overload a single shard, creating severe hotspots, and resharding requires complex range splitting operations. 
+
+    Several common hotspot causes affect distributed metadata systems. Shared root folders with many concurrent users generating concentrated read/write traffic, recursive permission updates create metadata write amplification, and high-profile users or shared service accounts can trigger intense hotspots. Temporal events, such as large uploads during business deadlines, also create traffic spikes. Mitigation strategies include caching folder listings and permission checks with short TTLs, using read replicas for immutable version metadata, rate limiting high traffic folders, and dynamically splitting overloaded partitions. These techniques improve scalability, maintain performance, and reduce the risk of shard overload in large scale distributed file systems.   
+
+  
+
+B - Rebalancing Strategy - Consistent Hashing & Virtual Slots 
+
+    Traditional modulo hashing (hash(key) mod N) creates major operational problems in distributed database clusters because adding or removing a node changes the denominator N, forcing roughly half of all keys to move to different servers. This results in massive data migration, cache invalidation, increased latency, and potential downtime during scaling events. To avoid this, the system uses consistent hashing, where both database nodes and metadata keys are mapped onto a circular hash ring numbered from 0 to 2^32. Each key is assigned to the next clockwise node on the ring, meaning that when a new node is added, only the keys in its neighboring hash range must move. 
+
+    To further improve load balancing, the design uses virtual slots (vnodes) rather than placing physical nodes directly on the ring. Each physical database node is assigned many virtual slots. They create much more uniform distribution because many small partitions statistically smooth out uneven load patterns. They also allows smooth rebalancing by moving only a subset of vnodes between machines instead of entire datasets and supports heterogeneous hardware by assigning stronger servers more vnodes and weaker servers fewer, distributing traffic according to capacity. 
+
+    When adding a new database node, the system performs rebalancing in multiple controlled phases to minimize user-visible disruption. In the pre-warming phase, the new node receives its vnode assignments and begins copying the metadata ranges it will eventually own from existing nodes. During this stage, old nodes continue serving all production traffic, so users experience no interruption while the new node builds indexes and validates copied data in the background. 
+
+    Next, the system enters shadow mode, where writes are temporarily duplicated to both the old and new nodes for a short validation period. This allows operators to monitor replication lag, latency, and error rates before committing to the topology change. The process also warms the new node’s caches under real production traffic. 
+
+    Finally, during the cutover phase, routing tables are updated so clients begin directing requests to the new node for its assigned vnodes. Versioned routing metadata prevents split-brain inconsistencies by ensuring clients use the latest cluster topology. Old nodes retain copied data for 24 to 48 hours as a rollback safety measure in case problems emerge after deployment. 
+
+    The strategy minimizes disruption through throttled background copying, controlled dual writes, and gradual traffic migration. Temporary latency increases are limited to the shadow phase, while throttling ensures rebalancing consumes only a small percentage of cluster I/O capacity. If failures occur during migration, the system prioritizes safety over speed by reverting traffic to existing nodes without risking data loss. 
+
+  
+
+C - Isolation & Anomalies - Snapshot Isolation Under Concurrent Operations 
+
+    Snapshot isolation (SI) is concurrency control technique where each transaction operates on a consistent snapshot of the database taken at its start. Reads always return the latest committed version of each row that existed at that snapshot, ensuring consistent, repeatable reads within a transaction. Writes follow a first committer wins rule where a transaction can only commit if no other concurrent transaction has modified the same rows since its snapshot began. This prevents dirty reads, non-repeatable reads, and lost updates. Snapshot Isolation still allows more subtle correctness issues like write skew, which becomes critical in distributed file metadata systems. 
+
+    Write skew is a database concurrency anomaly that occurs when two concurrent transactions read the same data set but update different, yet related, records. In file permission systems, this directly threatens invariants that depend on relationships across rows. For example, consider the rule that “at least one admin must remain” in a shared folder. If two admins (Alice and Bob) concurrently demote themselves, both transactions read the same snapshot showing two admins. Each independently verifies that at least one admin will remain after their own change, and both proceed to update different permission rows. Because Snapshot Isolation only detects conflicts on the same row, both commits succeed. The result is a folder with zero admins, violating a global system rule even though no individual transaction behaved incorrectly. 
+
+   This same anomaly appears in other file system operations. In permission management, concurrent sharing actions can produce duplicate entries when multiple users invite the same person based on the same snapshot state. In quota enforcement, two concurrent uploads may each observe sufficient remaining storage, but together exceed the quota after commit. Since each transaction updates different metadata rows (or evaluates state before writes occur), SI does not detect a conflict.  
+
+    These anomalies matter because file metadata systems rely heavily on cross-row invariants like quotas must not be exceeded globally, access control rules must remain consistent across users and folders etc. Snapshot Isolation is therefore insufficient on its own for correctness in these cases, even though it performs well and scales effectively. 
+
+    To address these issues, systems typically combine Snapshot isolation with targeted safeguards. Stronger isolation levels such as Serializable Isolation eliminate write skew by detecting dangerous dependency cycles, but at a significant performance cost due to predicate tracking and transaction aborts. A common approach is application-level locking, where operations like permission changes or quota updates acquire a lock on the folder or tenant before proceeding, forcing conflicting transactions to serialize. Another strategy is materialized constraints, where cross row conditions (such as admin counts or quota usage) are stored as explicit fields on a single row, converting logical constraints into direct write-write conflicts that SI can correctly enforce.

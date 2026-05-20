@@ -28,7 +28,8 @@ Per the course submission criteria, each team member's distinct architectural fo
 
 Student 1 (Control Plane): Tracking file metadata, database cluster sharding mechanics, hash vs. range partitioning, consistent hashing/virtual slots, and database isolation levels (Snapshot Isolation and write skew anomalies).
 
-Link to Control Plane Design File: ./student_1_control_plane.md
+Link to Control Plane Design File: ./Farida_Balogun_The_Control_Plane.md
+and figure1 ./figure1.png   figure2 ./figure2.png
 
 Student 2 (The Data Plane - Weijun Huang): Block storage organization, CRUSH algorithmic data placement math, Three-Way Replication vs. Erasure Coding financial and CPU trade-offs, strict Quorum math constraints (R+W>N), and background healing engines (Read Repairs and Merkle Tree Anti-Entropy).
 

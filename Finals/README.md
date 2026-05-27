@@ -41,4 +41,4 @@ Link to Sync Engine Design File: ./sasha_radosav_sync_engine.md
 
 Student 4 (System Degradation & Chaos Testing - Anour Ibrahim): SRE engineering patterns (graceful degradation, bulkheads, circuit breakers), controlled repair thresholds, Chaos Engineering runbook design (Storage Rack Failure Simulation parameters), and system queue backpressure telemetry.
 
-Link to System Degradation Design File: ./anour_ibrahim_system_degradation.md
+Link to System Degradation Design File: ./Anour_Ibrahim_System_Degradation_and_Chaos_Testing_V2.md
